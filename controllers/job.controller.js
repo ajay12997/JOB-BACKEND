@@ -80,6 +80,27 @@ const getJobById = async (req, res) => {
     }
 };
 
+// fetch jobs posted by perticular recruiter
+const getJobsByRecruiter = async (req, res) => {
+    try {
+        const recruiterId = req.user.user_id; // Extract recruiter_id from token
+
+        if (!recruiterId) {
+            return res.status(403).json({ message: "Unauthorized: Recruiter ID missing" });
+        }
+
+        const jobs = await JobPost.find({ recruiter_id: recruiterId }).sort({ posted_date: -1 });
+
+        if (!jobs.length) {
+            return res.status(404).json({ message: "No jobs found for this recruiter" });
+        }
+
+        res.status(200).json({ jobs });
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching recruiter jobs", error: error.message });
+    }
+};
+
 
 // Remove a job posting (Employer)
 const deleteJob = async (req, res) => {
@@ -123,4 +144,4 @@ const updateJob = async (req, res) => {
     }
 };
 
-module.exports = { createJob, getAllJobs, getJobById, deleteJob, updateJob };
+module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob };
