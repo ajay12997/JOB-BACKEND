@@ -43,7 +43,7 @@ const getAllJobs = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        // const skip = (page - 1) * limit;
+        const skip = (page - 1) * limit;
 
         let query = {};
         if (req.query.location) query.location = req.query.location;
@@ -52,7 +52,7 @@ const getAllJobs = async (req, res) => {
 
         const jobs = await JobPost.find(query)
             .sort({ posted_date: -1 })
-            // .skip(skip)
+            .skip(skip)
             .limit(limit);
 
         const totalJobs = await JobPost.countDocuments(query);
