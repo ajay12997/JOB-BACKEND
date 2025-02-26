@@ -117,7 +117,7 @@ const uploadResume = async (req, res) => {
   }
 };
 
-// get user api for resume
+
 const getResume = async (req, res) => {
   try {
       const { user_id } = req.params;

@@ -54,6 +54,14 @@ const JobPostSchema = new mongoose.Schema(
             type: String,
             match: /^\d+(\s*-\s*\d+|\+)?\s*years$/, 
             required: true 
+        },
+        industry_type: {
+            type: String,
+            required: true
+        },
+        department: {
+            type: String,
+            required: true
         }
     },
     { timestamps: true }
