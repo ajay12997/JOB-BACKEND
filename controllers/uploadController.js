@@ -61,4 +61,39 @@ const getAllResumes = async (req, res) => {
   }
 };
 
-module.exports = {uploadResume, getResume,getAllResumes} ;
+const deleteResume = async (req, res) => {
+  try {
+      const { user_id } = req.params;
+
+      // Find resume in MongoDB
+      const resume = await Resume.findOne({ user_id });
+
+      if (!resume) {
+          return res.status(404).json({ message: "Resume not found" });
+      }
+
+      // Extract S3 file key from URL
+      try {
+          const urlParts = new URL(resume.file_url);
+          const fileKey = decodeURIComponent(urlParts.pathname.substring(1)); // Remove leading '/'
+      
+          // Delete from S3
+          await s3.deleteObject({
+              Bucket: process.env.AWS_BUCKET_NAME,
+              Key: fileKey,
+          }).promise();
+
+      } catch (s3Error) {
+          return res.status(500).json({ message: "Error deleting file from S3", error: s3Error.message });
+      }
+
+      // Delete from MongoDB only if S3 deletion was successful
+      await Resume.deleteOne({ user_id });
+
+      res.status(200).json({ message: "Resume deleted successfully" });
+
+  } catch (error) {
+      res.status(500).json({ message: "Server Error", error: error.message });
+  }
+};
+module.exports = {uploadResume, getResume,getAllResumes,deleteResume} ;
