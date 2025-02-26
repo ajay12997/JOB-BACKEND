@@ -5,7 +5,7 @@ const csv = require("csv-parser");
 // MongoDB connection URI and configuration
 const uri = "mongodb+srv://jobportal:1234@jobportal.or090.mongodb.net";
 const dbName = "jobPortalDB";
-const collectionName = "jobpost";
+const collectionName = "jobposts";
 
 // Function to update documents
 async function updateDocuments() {
@@ -21,7 +21,7 @@ async function updateDocuments() {
     // Read CSV file
     const csvData = [];
     await new Promise((resolve, reject) => {
-      fs.createReadStream("jobpost.csv")
+      fs.createReadStream("sampled.csv")
         .pipe(csv())
         .on("data", (row) => {
           csvData.push(row);
