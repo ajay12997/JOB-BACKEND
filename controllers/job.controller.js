@@ -43,7 +43,7 @@ const getAllJobs = async (req, res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         const limit = parseInt(req.query.limit) || 10;
-        // const skip = (page - 1) * limit;
+        const skip = (page - 1) * limit;
 
         let query = {};
         if (req.query.location) query.location = req.query.location;
@@ -52,7 +52,7 @@ const getAllJobs = async (req, res) => {
 
         const jobs = await JobPost.find(query)
             .sort({ posted_date: -1 })
-            // .skip(skip)
+            .skip(skip)
             .limit(limit);
 
         const totalJobs = await JobPost.countDocuments(query);
@@ -77,6 +77,27 @@ const getJobById = async (req, res) => {
         res.status(200).json(job);
     } catch (error) {
         res.status(500).json({ message: "Error fetching job", error: error.message });
+    }
+};
+
+// fetch jobs posted by perticular recruiter
+const getJobsByRecruiter = async (req, res) => {
+    try {
+        const recruiterId = req.user.user_id; // Extract recruiter_id from token
+
+        if (!recruiterId) {
+            return res.status(403).json({ message: "Unauthorized: Recruiter ID missing" });
+        }
+
+        const jobs = await JobPost.find({ recruiter_id: recruiterId }).sort({ posted_date: -1 });
+
+        if (!jobs.length) {
+            return res.status(404).json({ message: "No jobs found for this recruiter" });
+        }
+
+        res.status(200).json({ jobs });
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching recruiter jobs", error: error.message });
     }
 };
 
@@ -123,4 +144,4 @@ const updateJob = async (req, res) => {
     }
 };
 
-module.exports = { createJob, getAllJobs, getJobById, deleteJob, updateJob };
+module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob };
