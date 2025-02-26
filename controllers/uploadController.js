@@ -22,9 +22,9 @@ const uploadResume = async (req, res) => {
         const oldFileKey = existingResume.current_file_url.split(".com/")[1];
 
         if (!oldFileKey) {
-          console.warn("⚠️ Old file key extraction failed:", existingResume.current_file_url);
+          console.warn(" Old file key extraction failed:", existingResume.current_file_url);
         } else {
-          console.log("🔍 Old file key:", oldFileKey);
+          console.log(" Old file key:", oldFileKey);
 
           // Check if resume was used in any application
           const resumeUsed = await Application.exists({ user_id: userId });
@@ -48,12 +48,12 @@ const uploadResume = async (req, res) => {
             Key: oldFileKey
           }).promise().catch((err) => {
             if (err.code !== "NoSuchKey") {
-              console.error("❌ Error deleting old file:", err);
+              console.error(" Error deleting old file:", err);
             }
           });
         }
       } catch (err) {
-        console.error("❌ Error handling existing resume:", err);
+        console.error(" Error handling existing resume:", err);
       }
     }
 
@@ -88,7 +88,7 @@ const uploadResume = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ Upload error:", error);
+    console.error("Upload error:", error);
     res.status(500).json({ message: "Server error", error: error.message || error });
   }
 };
@@ -106,7 +106,7 @@ const getResume = async (req, res) => {
           return res.status(404).json({ message: "Resume not found" });
       }
 
-      res.status(200).json({ file_url: resume.file_url });
+      res.status(200).json({ file_url: resume.current_file_url });
   } catch (error) {
       res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -142,7 +142,7 @@ const deleteResume = async (req, res) => {
 
       // Extract S3 file key from URL
       try {
-          const urlParts = new URL(resume.file_url);
+          const urlParts = new URL(resume.current_file_url);
           const fileKey = decodeURIComponent(urlParts.pathname.substring(1)); // Remove leading '/'
       
           // Delete from S3
