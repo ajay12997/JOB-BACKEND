@@ -93,7 +93,8 @@ const uploadResume = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message || error });
   }
 };
-// get user for resume
+
+
 const getResume = async (req, res) => {
   try {
       const { user_id } = req.user;
