@@ -10,8 +10,8 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 router.post("/upload", authMiddleware, upload.single("resume"), uploadResume);
-router.get("/resume/:user_id", getResume);
-router.delete("/delete/:user_id",deleteResume);
+router.get("/resume",authMiddleware, getResume);
+router.delete("/delete",authMiddleware, deleteResume);
 router.get("/resumes", getAllResumes);
 
 module.exports = router;
