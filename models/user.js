@@ -9,6 +9,10 @@ const UserSchema = new mongoose.Schema({
     role: {  type: Number, 
         enum: [1, 2, 3], // 1: Admin, 2: Recruiter, 3: Candidate
         default: 3, required: true  },
+    education: { type: String }, // Added field for education
+    skills: { type: [String] },  // Added array field for skills
+    currentLocation: { type: String }, // Added field for current location
+    aboutMe: { type: String },
     resetPasswordToken: { type: String },
     resetPasswordExpires: { type: Date },
     isVerified:{type:Boolean,default:false},
