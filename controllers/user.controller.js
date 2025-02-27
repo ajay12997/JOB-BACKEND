@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
+const resume = require("../models/resumes");
 const {sendResetEmail, sendVerificationEmail}=require("../config/nodemailer");
 
 
@@ -110,9 +111,9 @@ const userLogin =async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return res.status(401).json({ message: "Invalid Credentials" });
         console.log("isVerified",user.isVerified);
-        // if (!user.isVerified) {
-        //     return res.status(403).json({ message: "Please verify your email before logging in." });
-        // }
+        if (!user.isVerified) {
+            return res.status(403).json({ message: "Please verify your email before logging in." });
+        }
 
         // Compare Passwords
         const isMatch = await bcrypt.compare(password, user.password);
@@ -124,6 +125,9 @@ const userLogin =async (req, res) => {
             }
          });
 
+          // Fetch resume details
+        const Resume = await resume.findOne({ user_id: user._id });
+         console.log("Resume", Resume);
         // Generate Token
         const token = jwt.sign({ user_id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
@@ -133,9 +137,11 @@ const userLogin =async (req, res) => {
             role: user.role,
             email: user.email,
             user_id: user._id,
-            organizationName: user.organizationName 
-
+            organizationName: user.organizationName,
+            resumeUrl: Resume ? Resume.current_file_url : "", 
+            isUploaded: !!Resume,  
           },token });
+
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
