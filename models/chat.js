@@ -7,7 +7,7 @@ const chatSchema = new mongoose.Schema({
   messages: [
     {
       senderId: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
-      message: { type: String, required: true }, // ✅ Ensure message is required inside array
+      message: { type: String, required: true }, // Ensure message is required inside array
       timestamp: { type: Date, default: Date.now }
     }
   ],

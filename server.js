@@ -31,6 +31,7 @@ app.use("/api/users", userRoutes);
 app.use("/api/jobs", jobRoutes); 
 app.use("/api/resumes", uploadRoutes);
 app.use("/chat", chatRoutes);
+app.use("/api/applicatins", applicationRoutes);
 
 io.on("connection", (socket) => {
   console.log("User connected:", socket.id);
