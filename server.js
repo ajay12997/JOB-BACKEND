@@ -5,6 +5,7 @@ const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const jobRoutes = require("./routes/jobRoutes");
+const applicationRoutes = require("./routes/applicationRoutes");
 
 
 
@@ -18,6 +19,7 @@ app.use(cors());
 app.use("/api/users", userRoutes);
 app.use("/api/jobs", jobRoutes); 
 app.use("/api/resumes", uploadRoutes);
+app.use("/api/applications", applicationRoutes);
 
 
 app.get("/", (req, res) => {

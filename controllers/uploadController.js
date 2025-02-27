@@ -1,42 +1,8 @@
 const s3 = require("../config/awsConfig");
 const Resume = require("../models/resumes");
-
-// const uploadResume = async (req, res) => {
-//   try {
-//     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
-
-//     const userId =  req.user.user_id;
-//     const file = req.file;
-//     const fileKey = `resumes/${Date.now()}-${file.originalname}`;
-
-//     // Upload file directly to S3
-//     const uploadParams = {
-//       Bucket: process.env.AWS_BUCKET_NAME,
-//       Key: fileKey,
-//       Body: file.buffer,
-//       ContentType: file.mimetype,
-//     };
-
-//     const uploadResult = await s3.upload(uploadParams).promise();
-//     const fileUrl = uploadResult.Location;
-
-//     // Store file URL in MongoDB
-//     const newResume = new Resume({ user_id: userId, file_url: fileUrl });
-//     await newResume.save();
-
-//     res.status(201).json({ message: "File uploaded successfully", fileUrl });
-//   } catch (error) {
-//     console.error("Upload error:", error);
-//     res.status(500).json({ message: "Server error", error: error.message });
-//   }
-// };
-// try upload using application
-
-
 const Application = require("../models/Application");
 
-
-
+// upload resume
 const uploadResume = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: "No file uploaded" });
@@ -50,31 +16,45 @@ const uploadResume = async (req, res) => {
 
     let previousFileUrl = null;
 
-    if (existingResume) {
-      // Extract file key from existing resume URL
-      const oldFileKey = existingResume.current_file_url.split(".com/")[1];
+    if (existingResume && existingResume.current_file_url) {
+      try {
+        // Extract file key safely
+        const oldFileKey = existingResume.current_file_url.split(".com/")[1];
 
-      // Check if the existing resume was used in any job application
-      const resumeUsed = await Application.exists({ user_id: userId });
+        if (!oldFileKey) {
+          console.warn(" Old file key extraction failed:", existingResume.current_file_url);
+        } else {
+          console.log(" Old file key:", oldFileKey);
 
-      if (resumeUsed) {
-        // Move old resume to "history" folder in S3
-        const historyFileKey = `history/${oldFileKey.split("/").pop()}`;
+          // Check if resume was used in any application
+          const resumeUsed = await Application.exists({ user_id: userId });
 
-        await s3.copyObject({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          CopySource: `${process.env.AWS_BUCKET_NAME}/${oldFileKey}`,
-          Key: historyFileKey
-        }).promise();
+          if (resumeUsed) {
+            // Move old resume to "history" folder in S3
+            const historyFileKey = `history/${oldFileKey.split("/").pop()}`;
 
-        previousFileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${historyFileKey}`;
+            await s3.copyObject({
+              Bucket: process.env.AWS_BUCKET_NAME,
+              CopySource: `${process.env.AWS_BUCKET_NAME}/${oldFileKey}`,
+              Key: historyFileKey
+            }).promise();
+
+            previousFileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${historyFileKey}`;
+          }
+
+          // Delete the old resume from "resumes" folder (ignore if it doesn't exist)
+          await s3.deleteObject({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: oldFileKey
+          }).promise().catch((err) => {
+            if (err.code !== "NoSuchKey") {
+              console.error(" Error deleting old file:", err);
+            }
+          });
+        }
+      } catch (err) {
+        console.error(" Error handling existing resume:", err);
       }
-
-      // Delete old resume from "resumes" folder
-      await s3.deleteObject({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: oldFileKey
-      }).promise();
     }
 
     // Upload new resume to S3
@@ -88,15 +68,11 @@ const uploadResume = async (req, res) => {
     const uploadResult = await s3.upload(uploadParams).promise();
     const newFileUrl = uploadResult.Location;
 
-    // Extract resume data (Replace with actual resume parser)
-    // const extractedData = { skills: [], education: [], experience: [] };
-
     // Update or create a resume record
     const updatedResumeData = {
       user_id: userId,
       current_file_url: newFileUrl,
       previous_file_url: previousFileUrl || "", // Empty if no previous file exists
-      parsed_data: extractedData,
     };
 
     if (existingResume) {
@@ -113,11 +89,12 @@ const uploadResume = async (req, res) => {
 
   } catch (error) {
     console.error("Upload error:", error);
-    res.status(500).json({ message: "Server error", error: error.message });
+    res.status(500).json({ message: "Server error", error: error.message || error });
   }
 };
 
 
+// get resumes 
 const getResume = async (req, res) => {
   try {
       const { user_id } = req.params;
@@ -129,11 +106,13 @@ const getResume = async (req, res) => {
           return res.status(404).json({ message: "Resume not found" });
       }
 
-      res.status(200).json({ file_url: resume.file_url });
+      res.status(200).json({ file_url: resume.current_file_url });
   } catch (error) {
       res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
+
+
 // GET All Resumes API
 const getAllResumes = async (req, res) => {
   try {
@@ -149,6 +128,7 @@ const getAllResumes = async (req, res) => {
   }
 };
 
+// delete resume
 const deleteResume = async (req, res) => {
   try {
       const { user_id } = req.params;
@@ -162,7 +142,7 @@ const deleteResume = async (req, res) => {
 
       // Extract S3 file key from URL
       try {
-          const urlParts = new URL(resume.file_url);
+          const urlParts = new URL(resume.current_file_url);
           const fileKey = decodeURIComponent(urlParts.pathname.substring(1)); // Remove leading '/'
       
           // Delete from S3

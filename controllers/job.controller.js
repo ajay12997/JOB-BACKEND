@@ -1,4 +1,4 @@
-const JobPost = require("../models/JobPost");
+const JobPost = require("../models/jobPost");
 const { body, validationResult } = require("express-validator");
 
 
