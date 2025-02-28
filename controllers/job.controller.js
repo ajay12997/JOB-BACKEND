@@ -1,4 +1,5 @@
 const JobPost = require("../models/jobPost");
+const Application = require('../models/Application');
 const { body, validationResult } = require("express-validator");
 
 

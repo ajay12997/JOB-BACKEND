@@ -176,5 +176,30 @@ const getApplicationsForRecruiter = async (req, res) => {
 };
 
 
+// withdraw application
+const withdrawApplication = async (req, res) => {
+    try {
+        const user_id = req.user.user_id; // Extract user ID from authenticated user
+        const { job_id } = req.query; // Get job_id from request params
 
-exports = module.exports = { postApplication,getApplicationsByUser,getApplicationsForRecruiter };
+        // Find the application
+        const application = await Application.findOne({ job_id, user_id });
+
+        if (!application) {
+            return res.status(404).json({ message: "Application not found" });
+        }
+
+        // Delete the application (withdraw)
+        await Application.deleteOne({ _id: application._id });
+
+        res.status(200).json({ message: "Application withdrawn successfully" });
+
+    } catch (error) {
+        res.status(500).json({ message: "Error withdrawing application", error: error.message });
+    }
+};
+
+
+
+
+exports = module.exports = { postApplication,getApplicationsByUser,getApplicationsForRecruiter,withdrawApplication };

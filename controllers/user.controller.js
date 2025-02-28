@@ -58,7 +58,7 @@ const userRegistration = async (req, res) => {
          // Generate Verification Token
          const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-         const verificationLink = `http://192.168.10.71:5000/api/auth/verify-email?token=${verificationToken}`;
+         const verificationLink = `http://localhost:5000/api/users/verifyEmail?token=${verificationToken}`;
          
          await sendVerificationEmail(user.email, verificationLink);
 
