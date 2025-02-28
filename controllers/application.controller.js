@@ -55,7 +55,8 @@ const getApplicationsByUser = async (req, res) => {
 
         // Implement pagination
         const applications = await Application.find({ user_id })
-            .select("job_id match_score createdAt updatedAt") // Exclude unnecessary fields
+            .select("job_id match_score createdAt updatedAt") 
+            .sort({ createdAt: -1 }) // Sort by createdAt in descending order
             .skip((page - 1) * limit)
             .limit(parseInt(limit));
 
