@@ -38,31 +38,41 @@ const createJob = async (req, res) => {
 };
 
 
-// List all jobs with filters
+// List all jobs with  Search filters 
+
 const getAllJobs = async (req, res) => {
     try {
-        const page = parseInt(req.query.page) || 1;
-        const limit = parseInt(req.query.limit) || 10;
-        const skip = (page - 1) * limit;
+        const { search = "", page = 1, limit = 10 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
 
-        let query = {};
-        if (req.query.location) query.location = req.query.location;
-        if (req.query.job_type) query.job_type = req.query.job_type;
-        if (req.query.experience) query.experience = req.query.experience;
+        // Decode URL-encoded search query (handles spaces)
+        const decodedSearch = decodeURIComponent(search);
 
-        const jobs = await JobPost.find(query)
+        let searchQuery = {};
+
+        if (decodedSearch.trim().length > 0) {
+            searchQuery.$or = [
+                { title: { $regex: decodedSearch, $options: "i" } },
+                { description: { $regex: decodedSearch, $options: "i" } },
+                { skills: { $regex: decodedSearch, $options: "i" } },
+                { location: { $regex: decodedSearch, $options: "i" } }
+            ];
+        }
+
+        const jobs = await JobPost.find(searchQuery)
             .sort({ posted_date: -1 })
             .skip(skip)
-            .limit(limit);
+            .limit(parseInt(limit));
 
-        const totalJobs = await JobPost.countDocuments(query);
+        const totalJobs = await JobPost.countDocuments(searchQuery);
 
         res.status(200).json({
             jobs,
             totalJobs,
-            currentPage: page,
-            totalPages: Math.ceil(totalJobs / limit),
+            currentPage: parseInt(page),
+            totalPages: Math.ceil(totalJobs / parseInt(limit)),
         });
+
     } catch (error) {
         res.status(500).json({ message: "Error fetching jobs", error: error.message });
     }
@@ -72,15 +82,27 @@ const getAllJobs = async (req, res) => {
 // Get details of a specific job
 const getJobById = async (req, res) => {
     try {
-        const job = await JobPost.findById(req.params.id);
+        const user_id = req.user.user_id; // Extract user_id from authenticated user
+        const job_id = req.params.id;
+
+        // Fetch job details
+        const job = await JobPost.findById(job_id);
         if (!job) return res.status(404).json({ message: "Job not found" });
-        res.status(200).json(job);
+
+        // Check if the user has already applied for this job
+        const isApplied = await Application.exists({ job_id, user_id });
+
+        res.status(200).json({
+            ...job._doc,
+            isApplied: !!isApplied 
+        });
+
     } catch (error) {
         res.status(500).json({ message: "Error fetching job", error: error.message });
     }
 };
 
-// fetch jobs posted by perticular recruiter
+// fetch jobs posted by perticular recruiter with search filter
 const getJobsByRecruiter = async (req, res) => {
     try {
         const recruiterId = req.user.user_id; // Extract recruiter_id from token
@@ -89,18 +111,53 @@ const getJobsByRecruiter = async (req, res) => {
             return res.status(403).json({ message: "Unauthorized: Recruiter ID missing" });
         }
 
-        const jobs = await JobPost.find({ recruiter_id: recruiterId }).sort({ posted_date: -1 });
+        // Extract query parameters
+        const { search = "", page = 1, limit = 10 } = req.query;
 
-        if (!jobs.length) {
-            return res.status(404).json({ message: "No jobs found for this recruiter" });
+        let filter = { recruiter_id: recruiterId };
+
+        if (search.trim()) {
+            const decodedSearch = decodeURIComponent(search).trim();
+            const searchRegex = new RegExp(decodedSearch, "i"); // Case-insensitive search
+
+            filter.$or = [
+                { title: searchRegex },
+                { description: searchRegex },
+                { location: searchRegex },
+                { education: searchRegex },
+                { skills: searchRegex },
+                { company: searchRegex },  
+                { jobType: searchRegex },  
+                { salary: searchRegex }    
+            ];
         }
 
-        res.status(200).json({ jobs });
+        // Pagination logic
+        const pageNumber = parseInt(page);
+        const pageSize = parseInt(limit);
+        const skip = (pageNumber - 1) * pageSize;
+
+        // Fetch filtered jobs with pagination
+        const jobs = await JobPost.find(filter)
+            .sort({ posted_date: -1 })
+            .skip(skip)
+            .limit(pageSize);
+
+        // Get total matching jobs count
+        const totalJobs = await JobPost.countDocuments(filter);
+        const totalPages = Math.ceil(totalJobs / pageSize);
+
+        res.status(200).json({
+            totalJobs,
+            totalPages,
+            currentPage: pageNumber,
+            pageSize,
+            jobs
+        });
     } catch (error) {
         res.status(500).json({ message: "Error fetching recruiter jobs", error: error.message });
     }
 };
-
 
 // Remove a job posting (Employer)
 const deleteJob = async (req, res) => {
@@ -144,4 +201,6 @@ const updateJob = async (req, res) => {
     }
 };
 
-module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob };
+
+  
+module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob};

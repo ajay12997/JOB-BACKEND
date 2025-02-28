@@ -2,7 +2,7 @@ const Chat = require("../models/chat");
 const Application = require("../models/Application");
 const JobPost = require("../models/jobPost");
 
-// ✅Send Message
+//Send Message
 const sendMessage = async (req, res) => {
     try {
       const { jobId, senderId, receiverId, message } = req.body;
@@ -11,11 +11,11 @@ const sendMessage = async (req, res) => {
         return res.status(400).json({ message: "Message content is required" });
       }
   
-      // 🔹 Validate job existence
+      //Validate job existence
       const job = await JobPost.findById(jobId);
       if (!job) return res.status(404).json({ message: "Job not found" });
   
-      // 🔹 Check if sender is a recruiter or applied candidate
+      //Check if sender is a recruiter or applied candidate
       const isRecruiter = job.recruiter_id.toString() === senderId;
       const isAppliedCandidate = await Application.exists({ job_id: jobId, user_id: senderId });
   
@@ -23,19 +23,19 @@ const sendMessage = async (req, res) => {
         return res.status(403).json({ message: "Unauthorized: Only applied candidates or recruiters can chat" });
       }
   
-      // 🔹 Find existing chat or create a new one
+      //Find existing chat or create a new one
       let chat = await Chat.findOne({ jobId, senderId, receiverId });
   
       if (!chat) {
         chat = new Chat({ jobId, senderId, receiverId, messages: [] });
       }
   
-      // 🔹 Ensure messages array exists before pushing
+      //Ensure messages array exists before pushing
       if (!Array.isArray(chat.messages)) {
         chat.messages = [];
       }
   
-      // 🔹 Add new message
+      //Add new message
       chat.messages.push({ senderId, message });
   
       await chat.save();
@@ -49,16 +49,16 @@ const sendMessage = async (req, res) => {
   
 
 
-// ✅ Get Messages for a Job Chat
+//Get Messages for a Job Chat
 const getMessages = async (req, res) => {
   try {
     const { jobId, userId, receiverId } = req.params;
 
-    // 🔹 Validate job existence
+    //Validate job existence
     const job = await JobPost.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
 
-    // 🔹 Check if user is a recruiter or applied candidate
+    //Check if user is a recruiter or applied candidate
     const isRecruiter = job.recruiter_id.toString() === userId;
     const isAppliedCandidate = await Application.exists({ job_id: jobId, user_id: userId });
 
@@ -66,7 +66,7 @@ const getMessages = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized access" });
     }
 
-    // 🔹 Retrieve chat messages
+    //Retrieve chat messages
     const chat = await Chat.findOne({ jobId, senderId: userId, receiverId });
 
     if (!chat) {

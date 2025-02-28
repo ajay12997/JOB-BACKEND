@@ -13,10 +13,12 @@ const UserSchema = new mongoose.Schema({
     skills: { type: [String] },  // Added array field for skills
     currentLocation: { type: String }, // Added field for current location
     aboutMe: { type: String },
-    resetPasswordToken: { type: String },
-    resetPasswordExpires: { type: Date },
+    resetOtp: { type: String }, // Stores the OTP
+    resetOtpExpires: { type: Date }, // Expiry timestamp for OTP
+    tempToken: { type: String }, // Temporary token for verified users
     isVerified:{type:Boolean,default:false},
     verificationToken: { type: String },
+    
     
 }, { timestamps: true });
 
