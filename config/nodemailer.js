@@ -8,19 +8,20 @@ const transporter = nodemailer.createTransport({
     }
 });
 
-const sendResetEmail = async (email, resetLink) => {
+const sendResetEmail = async (email, otp) => {
     try {
         const mailOptions = {
             from: process.env.EMAIL_USER,
             to: email,
-            subject: "Password Reset Request",
-            html: `<p>Click <a href="${resetLink}">here</a> to reset your password. This link is valid for 15 minutes.</p>`
+            subject: "Password Reset OTP",
+            html: `<p>Your OTP for password reset is: <strong>${otp}</strong></p>
+                   <p>This OTP is valid for 10 minutes. Do not share it with anyone.</p>`
         };
 
         await transporter.sendMail(mailOptions);
-        console.log("Reset Email Sent to:", email);
+        console.log("Reset OTP sent to:", email);
     } catch (error) {
-        console.error("Error Sending Reset Email:", error);
+        console.error("Error sending OTP email:", error);
     }
 };
 

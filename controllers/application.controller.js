@@ -9,7 +9,7 @@ const postApplication = async (req, res) => {
     try {
         const { job_id } = req.query;
         const user_id = req.user.user_id; // Extracted from token
-        console.log("id",job_id)
+        // console.log("id",job_id)
         // Check if the job exists
         const job = await JobPost.findById(job_id);
         console.log("job",job);
@@ -45,19 +45,22 @@ const postApplication = async (req, res) => {
 // fetch applications by user 
 const getApplicationsByUser = async (req, res) => {
     try {
-        const user_id  = req.user.user_id;
-
-        // Ensure the user is accessing their own applications or is an admin
-        if (req.user.user_id !== user_id && req.user.role !== "admin") {
-            return res.status(403).json({ message: "Unauthorized access" });
-        }
+        const user_id = req.user.user_id;
+        const { page = 1, limit = 10 } = req.query; // Pagination params
 
         console.log("user_id", user_id);
 
-        // Fetch applications
-        const applications = await Application.find({ user_id });
+        // Fetch total count of applications
+        const totalApplications = await Application.countDocuments({ user_id });
 
-        if (applications.length === 0) {
+        // Implement pagination
+        const applications = await Application.find({ user_id })
+            .select("job_id match_score createdAt updatedAt") 
+            .sort({ createdAt: -1 }) // Sort by createdAt in descending order
+            .skip((page - 1) * limit)
+            .limit(parseInt(limit));
+
+        if (!applications.length) {
             return res.status(404).json({ message: "No applications found" });
         }
 
@@ -68,67 +71,109 @@ const getApplicationsByUser = async (req, res) => {
         // Map job details to applications
         const applicationsWithJobs = applications.map(app => ({
             ...app._doc,
-            job_details: jobs.find(job => job._id.toString() === app.job_id) || null
+            job_details: jobs.find(job => job._id.toString() === app.job_id.toString()) || null
         }));
 
-        console.log("applicationsWithJobs", applicationsWithJobs);
+        // console.log("applicationsWithJobs", applicationsWithJobs);
 
-        res.status(200).json({ applications: applicationsWithJobs });
+        res.status(200).json({
+            total_applications: totalApplications,
+            current_page: parseInt(page),
+            total_pages: Math.ceil(totalApplications / limit),
+            applications: applicationsWithJobs
+        });
     } catch (error) {
         res.status(500).json({ message: "Error fetching applications", error: error.message });
     }
 };
+
 
 // fetch Applied Candidates for Recruiter's Jobs
 const getApplicationsForRecruiter = async (req, res) => {
     try {
-        const recruiter_id = req.user.user_id; // Extract recruiter ID from token
-        console.log("recruiter_id", recruiter_id);
-        // Ensure only recruiters can access this API
+        const recruiter_id = req.user.user_id;
+        const { job_id, search = "", page = 1, limit = 10 } = req.query; // Pagination & search
+
         if (req.user.role !== 2) {
             return res.status(403).json({ message: "Unauthorized access" });
         }
 
-        // Find jobs posted by this recruiter
-        const jobs = await JobPost.find({ recruiter_id });
-        if (!jobs.length) {
-            return res.status(404).json({ message: "No jobs found for this recruiter" });
+        // Check if the job exists and belongs to this recruiter
+        const job = await JobPost.findOne({ _id: job_id, recruiter_id });
+
+        if (!job) {
+            return res.status(404).json({ message: "Job not found or not posted by you" });
         }
 
-        // Extract job IDs
-        const jobIds = jobs.map(job => job._id.toString());
+        // Decode search query (handles spaces, special characters)
+        const decodedSearch = decodeURIComponent(search).trim();
 
-        // Fetch applications for these jobs
-        const applications = await Application.find({ job_id: { $in: jobIds } });
+        // Build search query for applications
+        let applicationQuery = { job_id };
 
-        if (!applications.length) {
-            return res.status(404).json({ message: "No applications found for your jobs" });
+        if (decodedSearch.length > 0) {
+            // Find matching users
+            const matchingUsers = await User.find({
+                $or: [
+                    { skills: { $regex: decodedSearch, $options: "i" } },
+                    { education: { $regex: decodedSearch, $options: "i" } },
+                    { name: { $regex: decodedSearch, $options: "i" } },
+                    { aboutMe: { $regex: decodedSearch, $options: "i" } },
+                    { currentLocation: { $regex: decodedSearch, $options: "i" } }
+                ]
+            }).select("_id"); // Fetch only user IDs
+
+            // Extract matching user IDs
+            const matchingUserIds = matchingUsers.map(user => user._id.toString());
+
+            // Filter applications by matching user IDs
+            applicationQuery.user_id = { $in: matchingUserIds };
         }
 
-        // Fetch user details for each applicant
+        // Get total applications count (for pagination)
+        const totalApplications = await Application.countDocuments(applicationQuery);
+
+        // Fetch paginated applications
+        const applications = await Application.find(applicationQuery)
+            .select("user_id match_score createdAt updatedAt") // Select necessary fields
+            .skip((parseInt(page) - 1) * parseInt(limit))
+            .limit(parseInt(limit));
+
+        // Fetch user details
         const userIds = applications.map(app => app.user_id);
-        const users = await User.find({ _id: { $in: userIds } });
+        const users = await User.find({ _id: { $in: userIds } }).select("-password -__v");
 
-        // Fetch job details
-        const jobsMap = {};
-        jobs.forEach(job => {
-            jobsMap[job._id.toString()] = job;
+     // Fetch resumes
+     const resumes = await resume.find({ user_id: { $in: userIds } }).select("user_id current_file_url");
+
+     // Map user and resume details to applications
+     const applicationsWithDetails = applications.map(app => {
+         const applicant = users.find(user => user._id.toString() === app.user_id.toString()) || null;
+         const resume = resumes.find(resume => resume.user_id.toString() === app.user_id.toString()) || null;
+     
+         return {
+             ...app._doc,
+             applicant_details: applicant
+                 ? {
+                     ...applicant._doc,
+                     resume_url: resume ? resume.current_file_url : null // Add resume URL
+                 }
+                 : null,
+         };
+     });
+
+        res.status(200).json({
+            total_applications: totalApplications,
+            current_page: parseInt(page),
+            total_pages: Math.ceil(totalApplications / limit),
+            job_details: job, // Return job details only once
+            applications: applicationsWithDetails, // Applications with applicant details
         });
-
-        // Format response data
-        const applicationsWithDetails = applications.map(app => ({
-            ...app._doc,
-            job_details: jobsMap[app.job_id] || null,
-            applicant_details: users.find(user => user._id.toString() === app.user_id) || null
-        }));
-
-        res.status(200).json({ applications: applicationsWithDetails });
 
     } catch (error) {
         res.status(500).json({ message: "Error fetching applications", error: error.message });
     }
 };
-
 
 
 
