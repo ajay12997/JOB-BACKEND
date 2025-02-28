@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/user");
 const resume = require("../models/resumes");
+const crypto = require("crypto");
 const {sendResetEmail, sendVerificationEmail}=require("../config/nodemailer");
 
 
@@ -57,7 +58,7 @@ const userRegistration = async (req, res) => {
          // Generate Verification Token
          const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-         const verificationLink = `http://localhost:5000/api/auth/verify-email?token=${verificationToken}`;
+         const verificationLink = `http://192.168.10.71:5000/api/auth/verify-email?token=${verificationToken}`;
          
          await sendVerificationEmail(user.email, verificationLink);
 
@@ -129,7 +130,7 @@ const userLogin =async (req, res) => {
         const Resume = await resume.findOne({ user_id: user._id });
          console.log("Resume", Resume);
         // Generate Token
-        const token = jwt.sign({ user_id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+        const token = jwt.sign({ user_id: user._id, role: user.role }, process.env.JWT_SECRET);
 
          res.json({ message: "Login Successful", 
             data: {
@@ -138,8 +139,8 @@ const userLogin =async (req, res) => {
             email: user.email,
             user_id: user._id,
             organizationName: user.organizationName,
-            resumeUrl: Resume ? Resume.current_file_url : "", 
-            isUploaded: !!Resume,  
+            resumeUrl: Resume && Resume.current_file_url ? Resume.current_file_url :" ", 
+            isUploaded:  Resume ? !!Resume.current_file_url : false,  
           },token });
 
     } catch (err) {
@@ -149,6 +150,7 @@ const userLogin =async (req, res) => {
 
 
 // forgot password 
+// Generate and send OTP
 const forgotPassword = async (req, res) => {
     try {
         const { email } = req.body;
@@ -156,33 +158,54 @@ const forgotPassword = async (req, res) => {
 
         if (!user) return res.status(404).json({ message: "User not found" });
 
-        const resetToken = crypto.randomBytes(32).toString("hex");
-        user.resetToken = resetToken;
-        user.resetTokenExpires = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+        const otp = crypto.randomInt(100000, 999999).toString(); // Generate 6-digit OTP
+        user.resetOtp = otp;
+        user.resetOtpExpires = Date.now() + 10 * 60 * 1000; // 10 min expiry
 
         await user.save();
 
-        const resetLink = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
-        await sendResetEmail(email, resetLink);
+        await sendResetEmail(email, `Your OTP for password reset is: ${otp}`);
 
-        res.status(200).json({ message: "Password reset link sent to your email" });
+        res.status(200).json({ message: "OTP sent to your email" });
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 };
 
 
-// reset password
+// Verify OTP 
+const verifyOtp = async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        const user = await User.findOne({ email, resetOtp: otp, resetOtpExpires: { $gt: Date.now() } });
+
+        if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
+
+        // Generate temporary token (or flag in session)
+        const tempToken = crypto.randomBytes(20).toString('hex'); 
+        user.tempToken = tempToken;
+        await user.save();
+
+        res.status(200).json({ message: "OTP verified", tempToken });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
+
+
+
+// reset password  
 const resetPassword = async (req, res) => {
     try {
-        const { token, newPassword } = req.body;
-        const user = await User.findOne({ resetToken: token, resetTokenExpires: { $gt: Date.now() } });
+        const { tempToken, newPassword } = req.body;
+        const user = await User.findOne({ tempToken });
 
-        if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+        if (!user) return res.status(400).json({ message: "Invalid request. Please verify OTP again." });
 
         user.password = await bcrypt.hash(newPassword, 10);
-        user.resetToken = undefined;
-        user.resetTokenExpires = undefined;
+        user.resetOtp = undefined;
+        user.resetOtpExpires = undefined;
+        user.tempToken = undefined;
 
         await user.save();
 
@@ -192,6 +215,27 @@ const resetPassword = async (req, res) => {
     }
 };
 
+// get user by id
+const getUser = async (req, res) => {
+    try {
+        const { user_id } = req.user; // Extracted from token
+        if (!user_id) {
+            return res.status(400).json({ message: "User ID is required" });
+        }
+
+        const user = await User.findById(user_id).select("-password");
+        
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        res.json(user);
+    } catch (err) {
+        res.status(500).json({ message: "Server Error", error: err.message });
+    }
+};
 
 
-module.exports = {userLogin,verifyEmail,userRegistration,forgotPassword,resetPassword};
+
+
+module.exports = {userLogin,verifyEmail,userRegistration,forgotPassword,verifyOtp,resetPassword,getUser};

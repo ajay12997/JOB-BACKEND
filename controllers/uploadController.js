@@ -131,50 +131,61 @@ const getAllResumes = async (req, res) => {
 // delete API
 const deleteResume = async (req, res) => {
   try {
-    const { user_id } = req.user;  // Fixed user_id extraction
+    const { user_id } = req.user;
 
     // Find resume in MongoDB
     const resume = await Resume.findOne({ user_id });
 
-    if (!resume) {
-      return res.status(404).json({ message: "Resume not found" });
+    if (!resume || !resume.current_file_url) {
+      return res.status(404).json({ message: "Resume not found in the database" });
     }
 
-    // Extract the file key from S3 URL safely
-    const fileUrl = resume.current_file_url; // ✅ Fix: Use the retrieved resume document
+    // Extract the file key from S3 URL
+    const fileUrl = resume.current_file_url;
+    const bucketName = process.env.AWS_BUCKET_NAME;
 
-    if (!fileUrl || !fileUrl.includes(".amazonaws.com/")) {
+    if (!fileUrl.includes(`${bucketName}.s3.`)) {
       return res.status(400).json({ message: "Invalid file URL format" });
     }
 
-    const fileKey = fileUrl.split(".amazonaws.com/")[1]; // Extract actual S3 key
+    const fileKey = fileUrl.split(`${bucketName}.s3.`)[1].split(".amazonaws.com/")[1];
 
     if (!fileKey) {
       return res.status(400).json({ message: "Could not extract file key from URL" });
     }
 
-    // Check if the resume was used in any job application
+    // Check if resume exists in S3
+    try {
+      await s3.headObject({ Bucket: bucketName, Key: fileKey }).promise();
+    } catch (err) {
+      if (err.code === "NotFound") {
+        return res.status(200).json({ message: "Nothing to delete, all clear" });
+      }
+      throw err;
+    }
+
+    // Check if the resume is used in any job application
     const resumeUsed = await Application.exists({ user_id });
 
     if (resumeUsed) {
-      // Move resume to history folder instead of deleting
+      // Move the resume to the history folder
       const historyFileKey = `history/${fileKey.split("/").pop()}`;
 
       await s3.copyObject({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        CopySource: `${process.env.AWS_BUCKET_NAME}/${fileKey}`,
+        Bucket: bucketName,
+        CopySource: `${bucketName}/${fileKey}`,
         Key: historyFileKey,
       }).promise();
 
-      // Update database with history file URL
-      const historyFileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${historyFileKey}`;
-      await Resume.updateOne({ user_id }, { previous_file_url: historyFileUrl });
-
-      // Delete resume from "resumes" folder
+      // Delete original resume from "resumes" folder
       await s3.deleteObject({
-        Bucket: process.env.AWS_BUCKET_NAME,
+        Bucket: bucketName,
         Key: fileKey,
       }).promise();
+
+      // Update database: remove current_file_url & add previous_file_url
+      const historyFileUrl = `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${historyFileKey}`;
+      await Resume.updateOne({ user_id }, { $set: { previous_file_url: historyFileUrl }, $unset: { current_file_url: 1 } });
 
       return res.status(200).json({
         message: "Resume moved to history folder",
@@ -182,9 +193,9 @@ const deleteResume = async (req, res) => {
       });
     }
 
-    // If not applied, delete from S3
+    // If resume is not used, delete it completely
     await s3.deleteObject({
-      Bucket: process.env.AWS_BUCKET_NAME,
+      Bucket: bucketName,
       Key: fileKey,
     }).promise();
 
@@ -197,6 +208,5 @@ const deleteResume = async (req, res) => {
     res.status(500).json({ message: "Server Error", error: error.message });
   }
 };
-
 
 module.exports = {uploadResume, getResume,getAllResumes,deleteResume} ;
