@@ -70,7 +70,7 @@ const getApplicationsByUser = async (req, res) => {
         // Map job details to applications
         const applicationsWithJobs = applications.map(app => ({
             ...app._doc,
-            job_details: jobs.find(job => job._id.toString() === app.job_id.toString()) || null
+            job_details: jobs.find(job => job._id.toString() === app.job_id.toString()) || " "
         }));
 
         // console.log("applicationsWithJobs", applicationsWithJobs);
