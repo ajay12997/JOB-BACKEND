@@ -99,16 +99,17 @@ const uploadResume = async (req, res) => {
 const getResume = async (req, res) => {
   try {
       const { user_id } = req.user;
-
+console.log("user id:",user_id);
       // Find resume from MongoDB
       const resume = await Resume.findOne({ user_id });
-
-      if (!resume) {
-          return res.status(404).json({ message: "Resume not found" });
+      console.log("Resume Query Result:", resume);
+        if (!resume.current_file_url) {
+          return res.status(404).json({ message: "No Current Resume Available" });
       }
 
       res.status(200).json({ file_url: resume.current_file_url });
   } catch (error) {
+    console.error("Error fetching resume:", error);
       res.status(500).json({ message: "Server Error", error: error.message });
   }
 };

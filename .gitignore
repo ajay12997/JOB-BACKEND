@@ -136,3 +136,4 @@ dist
 .pnp.*
 # Firebase service account key
 serviceAccountKey.json
+my-ec2-key.pem
