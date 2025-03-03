@@ -6,6 +6,7 @@ const crypto = require("crypto");
 const {sendResetEmail, sendVerificationEmail}=require("../config/nodemailer");
 
 
+
 // user register
 const userRegistration = async (req, res) => {
     try {
@@ -33,7 +34,7 @@ const userRegistration = async (req, res) => {
                 );
 
                 // Send new verification email
-                const verificationLink = `http://localhost:5000/api/auth/verify-email?token=${verificationToken}`;
+                const verificationLink = `http://localhost:5000/api/users/verifyEmail?token=${verificationToken}`;
                 await sendVerificationEmail(email, verificationLink);
 
                 return res.status(200).json({ 
@@ -93,13 +94,21 @@ const verifyEmail = async (req, res) => {
         user.isVerified = true;
         await user.save();
 
-        return res.status(200).json({ message: "Email verified successfully. You can now log in." });
+        return res.status(200).json({
+             message: "Email verified successfully. You can now log in.",
+             loginLink :`${process.env.FRONTEND_URL}/login`
+           
+
+         });
+         
 
     } catch (error) {
         console.error("Email Verification Error:", error);
         return res.status(400).json({ message: "Invalid or expired token." });
     }
+
 };
+
 
 
 // user login

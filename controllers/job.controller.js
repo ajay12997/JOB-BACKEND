@@ -43,6 +43,7 @@ const createJob = async (req, res) => {
 
 const getAllJobs = async (req, res) => {
     try {
+        const user_id = req.user.user_id; // Extract user_id from authenticated user
         const { search = "", page = 1, limit = 10 } = req.query;
         const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -67,12 +68,22 @@ const getAllJobs = async (req, res) => {
 
         const totalJobs = await JobPost.countDocuments(searchQuery);
 
+
+        // Fetch job listings with isApplied field
+        const jobsWithAppliedStatus = await Promise.all(
+            jobs.map(async (job) => {
+                const isApplied = await Application.exists({ job_id:job._id, user_id});
+                return { ...job._doc, isApplied: !!isApplied }; 
+            })
+        );
+
         res.status(200).json({
-            jobs,
+            jobs: jobsWithAppliedStatus,
             totalJobs,
             currentPage: parseInt(page),
             totalPages: Math.ceil(totalJobs / parseInt(limit)),
         });
+
 
     } catch (error) {
         res.status(500).json({ message: "Error fetching jobs", error: error.message });
