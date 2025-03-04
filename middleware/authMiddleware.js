@@ -15,7 +15,7 @@ const authMiddleware = (req, res, next) => {
         }
 
         req.user = { user_id: verified.user_id, role: verified.role  }; // Store user data in request
-        console.log("Authenticated user:", req.user);
+        // console.log("Authenticated user:", req.user);
 
         next();
     } catch (err) {

@@ -71,7 +71,8 @@ const getApplicationsByUser = async (req, res) => {
         // Map job details to applications
         const applicationsWithJobs = applications.map(app => ({
             ...app._doc,
-            job_details: jobs.find(job => job._id.toString() === app.job_id.toString()) || " "
+            job_details: jobs.find(job => job._id.toString() === app.job_id.toString()) || " ",
+            isVerified: true 
         }));
 
         // console.log("applicationsWithJobs", applicationsWithJobs);
