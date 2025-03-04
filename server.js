@@ -9,7 +9,7 @@ const connectDB = require("./config/db");
 const userRoutes = require("./routes/userRoutes");
 const uploadRoutes = require("./routes/uploadRoutes");
 const jobRoutes = require("./routes/jobRoutes");
-const applicationRoutes = require("./routes/applicationRoutes");
+const applicationRoutes= require("./routes/applicationRoutes");
 
 
 

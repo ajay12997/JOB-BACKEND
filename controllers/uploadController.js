@@ -1,6 +1,8 @@
 const s3 = require("../config/awsConfig");
 const Resume = require("../models/resumes");
 const Application = require("../models/Application");
+const RecommendedJob = require("../models/RecommendedJob");
+const axios = require("axios");
 
 // upload resume
 const uploadResume = async (req, res) => {
@@ -69,23 +71,51 @@ const uploadResume = async (req, res) => {
     const newFileUrl = uploadResult.Location;
 
     // Update or create a resume record
-    const updatedResumeData = {
-      user_id: userId,
-      current_file_url: newFileUrl,
-      previous_file_url: previousFileUrl || "", // Empty if no previous file exists
-    };
+    let resumeId;
+    // const updatedResumeData = {
+    //   user_id: userId,
+    //   current_file_url: newFileUrl,
+    //   previous_file_url: previousFileUrl || "", // Empty if no previous file exists
+    // };
 
     if (existingResume) {
-      await Resume.updateOne({ _id: existingResume._id }, updatedResumeData);
+     await Resume.updateOne(
+      {_id:existingResume._id},
+      {
+        current_file_url:newFileUrl,
+        previous_file_url:previousFileUrl || " ",
+      }
+     );
+     resumeId = existingResume._id;
     } else {
-      await new Resume(updatedResumeData).save();
+      const newResume = await new Resume({
+        user_id:userId,
+        current_file_url:newFileUrl,
+        previous_file_url: " ",
+      }).save();
+      resumeId = newResume._id;
     }
+    console.log("Resume saved with ID:", resumeId);
 
+    // Api for the job recommendation
+
+    const aiApiUrl = "http://35.171.18.88:8000/process_resume?resume_id=67bd6f58567eeadb819ec5a8&user_id=67bc54c5194ac85d25c30d62";
+    const aiResponse  = await axios.post(aiApiUrl,{
+      userId,
+      resumeId:resumeId.toString(),
+    });
+    
+    if(aiResponse.data?.recommendations){
+      console.log("AI recommendation",aiResponse.data.recommendations);
+      //save in mongo:
+      await saveRecommendationsToDB(userId, resumeId,aiResponse.data.recommendations);
+    }
     res.status(201).json({
       message: "Resume uploaded successfully",
       current_file_url: newFileUrl,
       resume_id: existingResume._id.toString(),
       previous_file_url: previousFileUrl || "No previous resume found",
+      recommendations: aiResponse.data.recommendations || [],
     });
 
   } catch (error) {
@@ -93,6 +123,23 @@ const uploadResume = async (req, res) => {
     res.status(500).json({ message: "Server error", error: error.message || error });
   }
 };
+// Function to save recommendation job in mongo
+async function saveRecommendationsToDB(userId, resumeId, recommendations) {
+  try {
+    await RecommendedJob.deleteMany({ user_id: userId }); // Clear previous recommendations
+
+    const recommendedJobs = recommendations.map((jobId) => ({
+      user_id: userId,
+      resume_id: resumeId,
+      job_id: jobId,
+    }));
+
+    await RecommendedJob.insertMany(recommendedJobs);
+    console.log("Recommendations saved to DB");
+  } catch (error) {
+    console.error("Error saving recommendations:", error);
+  }
+}
 
 
 // get resumes 
@@ -125,6 +172,7 @@ const getAllResumes = async (req, res) => {
       }
 
       res.status(200).json({ resumes });
+
   } catch (error) {
       res.status(500).json({ message: "Server Error", error: error.message });
   }
@@ -210,4 +258,4 @@ const deleteResume = async (req, res) => {
   }
 };
 
-module.exports = {uploadResume, getResume,getAllResumes,deleteResume} ;
+module.exports = {uploadResume, getResume,getAllResumes,deleteResume, saveRecommendationsToDB} ;
