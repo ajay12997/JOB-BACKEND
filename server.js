@@ -11,6 +11,7 @@ const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const Chat = require("./models/chat");
 
+
 const app = express();
 dotenv.config();
 connectDB();
