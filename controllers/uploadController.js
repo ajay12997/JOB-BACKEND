@@ -104,7 +104,7 @@ const uploadResume = async (req, res) => {
     }
 
     // Call external API after uploading resume
-    const aiApiUrl = `http://54.157.16.230/process_resume?resume_id=${resumeId}&user_id=${userId}`;
+    const aiApiUrl = `http://54.157.16.230:8000/process_resume?resume_id=${resumeId}&user_id=${userId}`;
     try {
        const response = await axios.get(aiApiUrl);
        console.log("ai data",response.data);

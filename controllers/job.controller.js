@@ -245,12 +245,21 @@ const getRecommendedJobs = async (req, res) => {
 
         // Fetch recommended job details
         const recommendedJobs = await JobPost.find({ _id: { $in: recommendedJobIds } });
+        
 
         // Add match score to each recommended job
-        const recommendedJobsWithScore = recommendedJobs.map(job => ({
+    
+const recommendedJobsWithScore = await Promise.all(
+    recommendedJobs.map(async (job) => {
+        const isApplied = await Application.exists({ job_id: job._id, user_id });
+        return {
             ...job._doc,
-            match_score: jobScoreMap[job._id.toString()] || 0
-        }));
+            match_score: jobScoreMap[job._id.toString()] || 0,
+            isApplied: !!isApplied, // Convert to boolean
+        };
+    })
+);
+
 
         // Pagination parameters
         const page = parseInt(req.query.page) || 1;
@@ -267,8 +276,7 @@ const getRecommendedJobs = async (req, res) => {
 
         // Send response
         res.status(200).json({
-            recommendedJobs: recommendedJobsWithScore,
-            jobs,
+            jobs : recommendedJobsWithScore,
             totalOtherJobs,
             currentPage: page,
             totalPages: Math.ceil(totalOtherJobs / limit)
