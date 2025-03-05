@@ -14,7 +14,6 @@ const validateJobPost = [
 // Create a new job (Employer)
 const createJob = async (req, res) => {
     const errors = validationResult(req);
-    console.log(req.body);
     
     if (!errors.isEmpty()) {
         return res.status(400).json({ message: "Validation failed", errors: errors.array() });
@@ -23,7 +22,7 @@ const createJob = async (req, res) => {
     try {
         let skills = req.body.skills;
         const recruiter_id = req.user.user_id;
-        console.log(recruiter_id);
+
         if (typeof skills === "string") {
             skills = skills.split(",").map(skill => skill.trim());
         } else if (!Array.isArray(skills)) {
