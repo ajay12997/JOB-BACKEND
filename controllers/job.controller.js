@@ -1,5 +1,6 @@
 const JobPost = require("../models/jobPost");
 const Application = require('../models/Application');
+const matches = require("../models/match");
 const { body, validationResult } = require("express-validator");
 
 
@@ -212,6 +213,59 @@ const updateJob = async (req, res) => {
     }
 };
 
+const getRecommendedJobs = async (req, res) => {
+    try {
+        const user_id = req.user.user_id;
+        console.log("userid", user_id);
+
+        // Fetch top 10 recommended jobs sorted by match_score
+        const matchedJobs = await matches.find({ user_id }).sort({ score: -1 });
+
+        console.log("recommended jobs", matchedJobs);
+
+        // Extract job IDs from matched jobs
+        const jobScoreMap = {};
+        const recommendedJobIds = matchedJobs.map(match => {
+            jobScoreMap[match.job_id.toString()] = match.score; // Store score with job_id
+            return match.job_id;
+        });
+
+        // Fetch recommended job details
+        const recommendedJobs = await JobPost.find({ _id: { $in: recommendedJobIds } });
+
+        // Add match score to each recommended job
+        const recommendedJobsWithScore = recommendedJobs.map(job => ({
+            ...job._doc,
+            match_score: jobScoreMap[job._id.toString()]
+        }));
+
+        // Pagination parameters for other jobs
+        const page = parseInt(req.query.page) || 1; // Default to page 1
+        const limit = 10; // Limit 10 per page
+        const skip = (page - 1) * limit;
+
+        // Fetch other jobs excluding recommended ones with pagination
+        const otherJobs = await JobPost.find({ _id: { $nin: recommendedJobIds } })
+            .skip(skip)
+            .limit(limit);
+
+        // Count total other jobs (for frontend pagination)
+        const totalOtherJobs = await JobPost.countDocuments({ _id: { $nin: recommendedJobIds } });
+
+        // Send response
+        res.status(200).json({
+            recommendedJobs: recommendedJobsWithScore,
+            otherJobs,
+            totalOtherJobs,
+            currentPage: page,
+            totalPages: Math.ceil(totalOtherJobs / limit)
+        });
+
+    } catch (error) {
+        console.error("Error fetching recommended jobs:", error);
+        res.status(500).json({ message: "Error fetching recommended jobs", error: error.message });
+    }
+};
 
   
-module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob};
+module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob,getRecommendedJobs};
