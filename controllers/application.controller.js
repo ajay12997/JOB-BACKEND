@@ -9,10 +9,9 @@ const postApplication = async (req, res) => {
     try {
         const { job_id } = req.query;
         const user_id = req.user.user_id; // Extracted from token
-        // console.log("id",job_id)
+
         // Check if the job exists
         const job = await JobPost.findById(job_id);
-        console.log("job",job);
         if (!job) return res.status(404).json({ message: "Job not found" });
 
         // Prevent recruiters from applying
@@ -20,10 +19,10 @@ const postApplication = async (req, res) => {
             return res.status(403).json({ message: "Only job seekers can apply" });
         }
 
-        // Check if the user has uploaded a resume
-        const userResume = await resume.findOne({ user_id });
-        if (!userResume) {
-            return res.status(400).json({ message: "You must upload a resume before applying" });
+        // Fetch the latest resume for this user
+        const Resume = await resume.findOne({ user_id }).sort({ createdAt: -1 }); // Get most recent resume
+        if (!Resume) {
+            return res.status(400).json({ message: "No resume found. Please upload a resume before applying." });
         }
 
         // Prevent duplicate applications
@@ -32,15 +31,26 @@ const postApplication = async (req, res) => {
             return res.status(400).json({ message: "You have already applied for this job" });
         }
 
-        // Create new application
-        const application = new Application({ job_id, user_id });
+        // Create new application with resume details
+        const application = new Application({
+            job_id,
+            user_id,
+            resume_id: Resume._id,
+            current_file_url: Resume.current_file_url, 
+        });
+
         await application.save();
 
-        res.status(201).json({ message: "Application submitted successfully", application });
+        res.status(201).json({
+            message: "Application submitted successfully",
+            application,
+        });
+
     } catch (error) {
         res.status(500).json({ message: "Error applying for job", error: error.message });
     }
 };
+
 
 // fetch applications by user 
 const getApplicationsByUser = async (req, res) => {
@@ -72,7 +82,7 @@ const getApplicationsByUser = async (req, res) => {
         const applicationsWithJobs = applications.map(app => ({
             ...app._doc,
             job_details: jobs.find(job => job._id.toString() === app.job_id.toString()) || " ",
-            isVerified: true 
+            isApplied: true 
         }));
 
         // console.log("applicationsWithJobs", applicationsWithJobs);
@@ -101,7 +111,6 @@ const getApplicationsForRecruiter = async (req, res) => {
 
         // Check if the job exists and belongs to this recruiter
         const job = await JobPost.findOne({ _id: job_id, recruiter_id });
-
         if (!job) {
             return res.status(404).json({ message: "Job not found or not posted by you" });
         }
@@ -136,7 +145,7 @@ const getApplicationsForRecruiter = async (req, res) => {
 
         // Fetch paginated applications
         const applications = await Application.find(applicationQuery)
-            .select("user_id match_score createdAt updatedAt") // Select necessary fields
+            .select("user_id resume_id current_file_url match_score createdAt updatedAt") 
             .skip((parseInt(page) - 1) * parseInt(limit))
             .limit(parseInt(limit));
 
@@ -144,24 +153,20 @@ const getApplicationsForRecruiter = async (req, res) => {
         const userIds = applications.map(app => app.user_id);
         const users = await User.find({ _id: { $in: userIds } }).select("-password -__v");
 
-     // Fetch resumes
-     const resumes = await resume.find({ user_id: { $in: userIds } }).select("user_id current_file_url");
+        // Map user and resume details to applications
+        const applicationsWithDetails = applications.map(app => {
+            const applicant = users.find(user => user._id.toString() === app.user_id.toString()) || null;
 
-     // Map user and resume details to applications
-     const applicationsWithDetails = applications.map(app => {
-         const applicant = users.find(user => user._id.toString() === app.user_id.toString()) || null;
-         const resume = resumes.find(resume => resume.user_id.toString() === app.user_id.toString()) || null;
-     
-         return {
-             ...app._doc,
-             applicant_details: applicant
-                 ? {
-                     ...applicant._doc,
-                     resume_url: resume ? resume.current_file_url : null // Add resume URL
-                 }
-                 : null,
-         };
-     });
+            return {
+                ...app._doc,
+                applicant_details: applicant
+                    ? {
+                        ...applicant._doc,
+                        resume_url: app.current_file_url 
+                    }
+                    : null
+            };
+        });
 
         res.status(200).json({
             total_applications: totalApplications,
