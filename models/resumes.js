@@ -12,4 +12,5 @@ const ResumeSchema = new mongoose.Schema(
     { timestamps: true } 
 );
 
-module.exports = mongoose.model("resume", ResumeSchema);
+const Resume = mongoose.model("Resume", ResumeSchema);
+module.exports= Resume
