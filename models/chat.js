@@ -1,17 +1,16 @@
 const mongoose = require("mongoose");
 
 const chatSchema = new mongoose.Schema({
-  jobId: { type: mongoose.Schema.Types.ObjectId, ref: "jobposts", required: true },
-  senderId: { type: mongoose.Schema.Types.ObjectId,ref: "users", required: true },
-  receiverId: { type: mongoose.Schema.Types.ObjectId,ref: "users", required: true },
+  room: { type: String, required: true, unique: true },  // Room ID (sender_receiver pair)
   messages: [
     {
-      senderId: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true },
-      message: { type: String, required: true }, // Ensure message is required inside array
-      timestamp: { type: Date, default: Date.now }
+      _id: { type: mongoose.Schema.Types.ObjectId, auto: true }, // Auto-generated MongoDB ID
+      userId: { type: mongoose.Schema.Types.ObjectId, ref: "users", required: true }, // Sender ID
+      content: { type: String, required: true }, // Message text
+      sender: { type: String, required: true }, // Socket ID of sender
+      timestamp: { type: Date, default: Date.now } // Timestamp
     }
-  ],
-  timestamp: { type: Date, default: Date.now }
-});
+  ]
+}, { timestamps: true });
 
 module.exports = mongoose.model("Chat", chatSchema);

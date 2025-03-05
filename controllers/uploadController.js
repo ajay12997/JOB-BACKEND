@@ -4,43 +4,158 @@ const Application = require("../models/Application");
 const axios = require("axios");
 
 // Upload Resume
+// const uploadResume = async (req, res) => {
+//   try {
+//     if (!req.file) {
+//       return res.status(400).json({ message: "No file uploaded" });
+//     }
+
+//     // Validate user_id from req.user
+//     if (!req.user || !req.user.user_id) {
+//       return res.status(401).json({ message: "Unauthorized: Missing user data" });
+//     }
+
+//     const userId = req.user.user_id;
+
+//     const file = req.file;
+//     const newFileKey = `resumes/${Date.now()}-${file.originalname}`;
+
+//     // Check if the user already has a resume
+//     const existingResume = await Resume.findOne({ user_id: userId });
+//     let previousFileUrl = null;
+
+//     if (existingResume && existingResume.current_file_url) {
+//       try {
+//         // Extract file key safely
+//         const oldFileKey = existingResume.current_file_url.split(".com/")[1];
+
+//         if (!oldFileKey) {
+//           console.warn("Old file key extraction failed:", existingResume.current_file_url);
+//         } else {
+//           console.log("Old file key:", oldFileKey);
+
+//           // Check if resume was used in any application
+//           const resumeUsed = await Application.exists({ user_id: userId });
+
+//           if (resumeUsed) {
+//             // Move old resume to "history" folder in S3
+//             const historyFileKey = `history/${oldFileKey.split("/").pop()}`;
+
+//             await s3.copyObject({
+//               Bucket: process.env.AWS_BUCKET_NAME,
+//               CopySource: `${process.env.AWS_BUCKET_NAME}/${oldFileKey}`,
+//               Key: historyFileKey,
+//             }).promise();
+
+//             previousFileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${historyFileKey}`;
+//           }
+
+//           // Delete the old resume from "resumes" folder (ignore if it doesn't exist)
+//           await s3
+//             .deleteObject({
+//               Bucket: process.env.AWS_BUCKET_NAME,
+//               Key: oldFileKey,
+//             })
+//             .promise()
+//             .catch((err) => {
+//               if (err.code !== "NoSuchKey") {
+//                 console.error("Error deleting old file:", err);
+//               }
+//             });
+//         }
+//       } catch (err) {
+//         console.error("Error handling existing resume:", err);
+//       }
+//     }
+
+//     // Upload new resume to S3
+//     const uploadParams = {
+//       Bucket: process.env.AWS_BUCKET_NAME,
+//       Key: newFileKey,
+//       Body: file.buffer,
+//       ContentType: file.mimetype,
+//     };
+
+//     const uploadResult = await s3.upload(uploadParams).promise();
+//     const newFileUrl = uploadResult.Location;
+
+//     let resumeId;
+//     let newResume = " ";
+
+//     if (existingResume) {
+//       await Resume.updateOne(
+//         { _id: existingResume._id },
+//         {
+//           user_id: userId,
+//           current_file_url: newFileUrl,
+//           previous_file_url: previousFileUrl || " ",
+//         }
+//       );
+      
+//       resumeId = existingResume._id;
+//     } else {
+//       newResume = await new Resume({
+//         user_id: userId,
+//         current_file_url: newFileUrl,
+//         previous_file_url: " ",
+//       }).save();
+
+//       resumeId = newResume._id;
+//     }
+
+//     // Call external API after uploading resume
+//     const aiApiUrl = `http://54.157.16.230:8000/process_resume?resume_id=${resumeId}&user_id=${userId}`;
+//     try {
+//        const response = await axios.get(aiApiUrl);
+//        console.log("ai data",response.data);
+//       console.log("Successfully called external API");
+//     } catch (error) {
+//       console.error("Error calling external API:", error.message);
+//     }
+
+//     res.status(201).json({
+//       message: "Resume uploaded successfully",
+//       current_file_url: newFileUrl,
+//       resume_id: resumeId.toString(),
+//       previous_file_url: previousFileUrl || "No previous resume found",
+//     });
+//   } catch (error) {
+//     console.error("Upload error:", error);
+//     res.status(500).json({ message: "Server error", error: error.message || error });
+//   }
+// };
+
 const uploadResume = async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: "No file uploaded" });
     }
 
-    // Validate user_id from req.user
     if (!req.user || !req.user.user_id) {
       return res.status(401).json({ message: "Unauthorized: Missing user data" });
     }
 
     const userId = req.user.user_id;
-
     const file = req.file;
     const newFileKey = `resumes/${Date.now()}-${file.originalname}`;
 
-    // Check if the user already has a resume
+    // Check if user already has a resume
     const existingResume = await Resume.findOne({ user_id: userId });
     let previousFileUrl = null;
 
     if (existingResume && existingResume.current_file_url) {
       try {
-        // Extract file key safely
         const oldFileKey = existingResume.current_file_url.split(".com/")[1];
 
-        if (!oldFileKey) {
-          console.warn("Old file key extraction failed:", existingResume.current_file_url);
-        } else {
+        if (oldFileKey) {
           console.log("Old file key:", oldFileKey);
-
+          
           // Check if resume was used in any application
           const resumeUsed = await Application.exists({ user_id: userId });
 
           if (resumeUsed) {
-            // Move old resume to "history" folder in S3
             const historyFileKey = `history/${oldFileKey.split("/").pop()}`;
-
+            
             await s3.copyObject({
               Bucket: process.env.AWS_BUCKET_NAME,
               CopySource: `${process.env.AWS_BUCKET_NAME}/${oldFileKey}`,
@@ -50,25 +165,19 @@ const uploadResume = async (req, res) => {
             previousFileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${historyFileKey}`;
           }
 
-          // Delete the old resume from "resumes" folder (ignore if it doesn't exist)
-          await s3
-            .deleteObject({
-              Bucket: process.env.AWS_BUCKET_NAME,
-              Key: oldFileKey,
-            })
-            .promise()
-            .catch((err) => {
-              if (err.code !== "NoSuchKey") {
-                console.error("Error deleting old file:", err);
-              }
-            });
+          // Delete the old resume
+          await s3.deleteObject({ Bucket: process.env.AWS_BUCKET_NAME, Key: oldFileKey }).promise().catch((err) => {
+            if (err.code !== "NoSuchKey") {
+              console.error("Error deleting old file:", err);
+            }
+          });
         }
       } catch (err) {
         console.error("Error handling existing resume:", err);
       }
     }
 
-    // Upload new resume to S3
+    // Upload new resume
     const uploadParams = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: newFileKey,
@@ -80,51 +189,37 @@ const uploadResume = async (req, res) => {
     const newFileUrl = uploadResult.Location;
 
     let resumeId;
-    let newResume = " ";
-
     if (existingResume) {
       await Resume.updateOne(
         { _id: existingResume._id },
-        {
-          user_id: userId,
-          current_file_url: newFileUrl,
-          previous_file_url: previousFileUrl || " ",
-        }
+        { user_id: userId, current_file_url: newFileUrl, previous_file_url: previousFileUrl || " " }
       );
-      
       resumeId = existingResume._id;
     } else {
-      newResume = await new Resume({
-        user_id: userId,
-        current_file_url: newFileUrl,
-        previous_file_url: " ",
-      }).save();
-
+      const newResume = await new Resume({ user_id: userId, current_file_url: newFileUrl, previous_file_url: " " }).save();
       resumeId = newResume._id;
     }
 
-    // Call external API after uploading resume
-    const aiApiUrl = `http://54.157.16.230/process_resume?resume_id=${resumeId}&user_id=${userId}`;
-    try {
-       const response = await axios.get(aiApiUrl);
-       console.log("ai data",response.data);
-      console.log("Successfully called external API");
-    } catch (error) {
-      console.error("Error calling external API:", error.message);
-    }
-
+    //**Send success response immediately**
     res.status(201).json({
       message: "Resume uploaded successfully",
       current_file_url: newFileUrl,
       resume_id: resumeId.toString(),
       previous_file_url: previousFileUrl || "No previous resume found",
     });
+
+    // **Call external API asynchronously**
+    const aiApiUrl = `http://54.157.16.230:8000/process_resume?resume_id=${resumeId}&user_id=${userId}`;
+    
+    axios.get(aiApiUrl)
+      .then(response => console.log("AI processing response:", response.data))
+      .catch(error => console.error("Error calling external API:", error.message));
+
   } catch (error) {
     console.error("Upload error:", error);
     res.status(500).json({ message: "Server error", error: error.message || error });
   }
 };
-
 
 
 // get resumes 
