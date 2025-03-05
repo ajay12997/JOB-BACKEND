@@ -11,6 +11,9 @@ const jobRoutes = require("./routes/jobRoutes");
 const applicationRoutes = require("./routes/applicationRoutes");
 const Chat = require("./models/chat");
 
+const admin = require("./routes/admin");
+
+
 
 const app = express();
 dotenv.config();
@@ -120,6 +123,9 @@ app.use("/api/jobs", jobRoutes);
 app.use("/api/resumes", uploadRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/applications", applicationRoutes);
+
+app.use("/api/admin", admin);
+
 
 app.get("/", (req, res) => {
   res.send("API is running successfully ....");
