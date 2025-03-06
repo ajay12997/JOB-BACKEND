@@ -22,10 +22,10 @@ const uploadResume = async (req, res) => {
 
     const uploadResult = await s3.upload(uploadParams).promise();
     const fileUrl = uploadResult.Location;
-
     // Store file URL in MongoDB
     const newResume = new Resume({ user_id: userId, current_file_url: fileUrl });
     await newResume.save();
+
 
     // Send success response
     res.status(201).json({
