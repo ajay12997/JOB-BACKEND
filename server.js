@@ -22,6 +22,7 @@ connectDB();
 // Middleware
 app.use(express.json());
 app.use(cors());
+// app.use(cors({ origin: '*' }));
 
 // Create HTTP server and integrate Socket.IO
 const server = createServer(app);

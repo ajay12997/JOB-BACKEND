@@ -11,7 +11,7 @@ const {sendResetEmail, sendVerificationEmail}=require("../config/nodemailer");
 const userRegistration = async (req, res) => {
     try {
         // console.log("Received Request Body:", req.body); 
-        const { email, password, role} = req.body;
+        const { email, password, role,skills,education,aboutMe} = req.body;
         const organizationName = role === 2 ? req.body.organizationName:"";
         const name = role !== 2 ? req.body.name:"";
 
@@ -35,7 +35,7 @@ const userRegistration = async (req, res) => {
 
                 // Send new verification email
 
-                const verificationLink = `http://192.168.10.69:5000/api/users/verifyEmail?token=${verificationToken}`;
+                const verificationLink = `${process.env.API_BASE_URL}/api/users/verifyEmail?token=${verificationToken}`;
 
                 await sendVerificationEmail(email, verificationLink);
 
@@ -51,7 +51,7 @@ const userRegistration = async (req, res) => {
         const hashedPassword = await bcrypt.hash(password, salt);
 
         // Create New User
-        const user = new User({ name, organizationName, email, password: hashedPassword, role, isVerified: false});
+        const user = new User({ name, organizationName, email,skills,education,aboutMe, password: hashedPassword, role, isVerified: false});
         await user.save();
         
 
@@ -62,7 +62,7 @@ const userRegistration = async (req, res) => {
          const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
 
-         const verificationLink = `http://192.168.10.69:5000/api/users/verifyEmail?token=${verificationToken}`;
+         const verificationLink = `${process.env.API_BASE_URL}/api/users/verifyEmail?token=${verificationToken}`;
 
          
          await sendVerificationEmail(user.email, verificationLink);
