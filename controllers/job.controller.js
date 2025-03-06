@@ -1,5 +1,6 @@
 const JobPost = require("../models/jobPost");
 const Application = require('../models/Application');
+const matches = require("../models/match");
 const { body, validationResult } = require("express-validator");
 
 
@@ -13,7 +14,6 @@ const validateJobPost = [
 // Create a new job (Employer)
 const createJob = async (req, res) => {
     const errors = validationResult(req);
-    console.log(req.body);
     
     if (!errors.isEmpty()) {
         return res.status(400).json({ message: "Validation failed", errors: errors.array() });
@@ -22,7 +22,7 @@ const createJob = async (req, res) => {
     try {
         let skills = req.body.skills;
         const recruiter_id = req.user.user_id;
-        console.log(recruiter_id);
+
         if (typeof skills === "string") {
             skills = skills.split(",").map(skill => skill.trim());
         } else if (!Array.isArray(skills)) {
@@ -213,6 +213,79 @@ const updateJob = async (req, res) => {
     }
 };
 
+const getRecommendedJobs = async (req, res) => {
+    try {
+        const user_id = req.user?.user_id;
+        if (!user_id) {
+            return res.status(400).json({ message: "User ID is missing" });
+        }
+
+        console.log("userid", user_id);
+
+        // Fetch top recommended jobs sorted by match score
+        const matchedJobs = await matches.find({ user_id }).sort({ score: -1 });
+        console.log("Matched Jobs:", matchedJobs);
+
+        // Extract job IDs and store scores in a map
+        const jobScoreMap = {};
+        const recommendedJobIds = matchedJobs
+            .map(match => {
+                if (!match.job_id) {
+                    console.warn("Skipping match with missing job_id:", match);
+                    return null;
+                }
+                jobScoreMap[match.job_id.toString()] = match.score;
+                return match.job_id;
+            })
+            .filter(Boolean); // Remove null values
+
+        console.log("JobScoreMap:", jobScoreMap);
+        console.log("Recommended Job IDs:", recommendedJobIds);
+
+        // Fetch recommended job details
+        const recommendedJobs = await JobPost.find({ _id: { $in: recommendedJobIds } });
+        
+
+        // Add match score to each recommended job
+    
+const recommendedJobsWithScore = await Promise.all(
+    recommendedJobs.map(async (job) => {
+        const isApplied = await Application.exists({ job_id: job._id, user_id });
+        return {
+            ...job._doc,
+            match_score: jobScoreMap[job._id.toString()] || 0,
+            isApplied: !!isApplied, // Convert to boolean
+        };
+    })
+);
+
+
+        // Pagination parameters
+        const page = parseInt(req.query.page) || 1;
+        const limit = 10;
+        const skip = (page - 1) * limit;
+
+        // Fetch other jobs excluding recommended ones with pagination
+        const jobs = await JobPost.find({ _id: { $nin: recommendedJobIds } })
+            .skip(skip)
+            .limit(limit);
+
+        // Count total other jobs (for frontend pagination)
+        const totalOtherJobs = await JobPost.countDocuments({ _id: { $nin: recommendedJobIds } });
+
+        // Send response
+        res.status(200).json({
+            jobs : recommendedJobsWithScore,
+            totalOtherJobs,
+            currentPage: page,
+            totalPages: Math.ceil(totalOtherJobs / limit)
+        });
+
+    } catch (error) {
+        console.error("Error fetching recommended jobs:", error);
+        res.status(500).json({ message: "Error fetching recommended jobs", error: error.message });
+    }
+};
 
   
-module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob};
+module.exports = { createJob, getAllJobs, getJobById, getJobsByRecruiter, deleteJob, updateJob,getRecommendedJobs};

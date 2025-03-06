@@ -34,7 +34,9 @@ const userRegistration = async (req, res) => {
                 );
 
                 // Send new verification email
-                const verificationLink = `http://localhost:5000/api/users/verifyEmail?token=${verificationToken}`;
+
+                const verificationLink = `http://192.168.10.69:5000/api/users/verifyEmail?token=${verificationToken}`;
+
                 await sendVerificationEmail(email, verificationLink);
 
                 return res.status(200).json({ 
@@ -59,7 +61,9 @@ const userRegistration = async (req, res) => {
          // Generate Verification Token
          const verificationToken = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
 
-         const verificationLink = `http://localhost:5000/api/users/verifyEmail?token=${verificationToken}`;
+
+         const verificationLink = `http://192.168.10.69:5000/api/users/verifyEmail?token=${verificationToken}`;
+
          
          await sendVerificationEmail(user.email, verificationLink);
 
@@ -96,10 +100,10 @@ const verifyEmail = async (req, res) => {
 
         return res.status(200).json({
              message: "Email verified successfully. You can now log in.",
-             loginLink :`${process.env.FRONTEND_URL}/login`
-           
 
-         });
+
+           });
+
          
 
     } catch (error) {
@@ -185,8 +189,8 @@ const forgotPassword = async (req, res) => {
 // Verify OTP 
 const verifyOtp = async (req, res) => {
     try {
-        const { email, otp } = req.body;
-        const user = await User.findOne({ email, resetOtp: otp, resetOtpExpires: { $gt: Date.now() } });
+        const { otp } = req.body;
+        const user = await User.findOne({ resetOtp: otp, resetOtpExpires: { $gt: Date.now() } });
 
         if (!user) return res.status(400).json({ message: "Invalid or expired OTP" });
 
