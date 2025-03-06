@@ -346,7 +346,9 @@ const uploadResume = async (req, res) => {
     if (existingResume) {
       await Resume.updateOne(
         { _id: existingResume._id },
+	      {user_id:userId},
         {
+
           current_file_url: newFileUrl,
           previous_file_url: previousFileUrl || " ",
         }
@@ -363,9 +365,14 @@ const uploadResume = async (req, res) => {
     console.log("Resume saved with ID:", resumeId);
 
     // Call external API after uploading resume
-    const aiApiUrl = `http://44.202.97.91:8000/process_resume?userId=${userId}&resumeId=${resumeId}`;
+ 	const aiApiUrl = `http://44.202.97.91:8000/process_resume?user_id=${newResume.user_id}&resume_id=${newResume._id}`;
+	  //
     try {
-      await axios.get(aiApiUrl);
+      //await axios.get(aiApiUrl);
+const aiResponse = await axios.post(aiApiUrl, {
+	user_id:userId.toString(),
+	        resume_id: resumeId.toString(),
+	    });
       console.log("Successfully called external API");
     } catch (error) {
       console.error("Error calling external API:", error.message);
