@@ -97,22 +97,10 @@ const deleteResume = async (req, res) => {
       return res.status(404).json({ message: "No resume found for this user" });
     }
 
-    // Extract the file key from S3 URL
-    const fileUrl = resume.current_file_url;
-    const fileKey = fileUrl.split(".com/")[1]; // Extract key after bucket domain
-
-    // Delete the file from S3
-    const deleteParams = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: fileKey,
-    };
-
-    await s3.deleteObject(deleteParams).promise();
-
-    // Delete the resume record from MongoDB
+    // Delete the resume record from MongoDB (but keep the file in S3)
     await Resume.deleteMany({ user_id: userId });
 
-    res.status(200).json({ message: "Resume deleted successfully" });
+    res.status(200).json({ message: "Resume deleted successfully from the database" });
 
   } catch (error) {
     console.error("Delete error:", error);
