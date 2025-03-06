@@ -36,7 +36,7 @@ const uploadResume = async (req, res) => {
     });
 
     // Trigger AI model API
-    const aiApiUrl = `http://54.157.16.230:8000/process_resume?resume_id=${newResume._id}&user_id=${userId}`;
+    const aiApiUrl = `${process.env.AI_BASE_URL}/process_resume?resume_id=${newResume._id}&user_id=${userId}`;
 
     axios.get(aiApiUrl)
       .then(response => console.log("AI processing response:", response.data))
